@@ -363,9 +363,10 @@ impl HtmlHandlebars {
             // up `root.join(original)`).
             let original = original.trim_start_matches("/");
             let filename = root.join(original);
-            let regex = Regex::new(r##"(^/.*$)"##).unwrap();
+            let regex = Regex::new(r##"(^/)"##).unwrap();
             let destination = if site_url.is_some() && site_url.as_ref() != Some(&"/".to_string()) && regex.is_match(new) {
-                format!("{}{}", site_url.as_ref().unwrap().to_string(), new.trim_start_matches("/"))
+                let site_url_value = site_url.as_ref().unwrap().to_string();
+                format!("{}{}", site_url_value.trim_end_matches("/"), new)
             } else {
                 new.to_string()
             };

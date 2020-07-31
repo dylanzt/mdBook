@@ -140,7 +140,7 @@ impl HtmlHandlebars {
         } else {
             debug!(
                 "HTML 'site-url' parameter not set, defaulting to '/'. Please configure \
-                this to ensure the 404 page work correctly, especially if your site is hosted in a \
+                this to ensure the 404 page works correctly, especially if your site is hosted in a \
                 subdirectory on the HTTP server."
             );
             "/"
@@ -348,6 +348,7 @@ impl HtmlHandlebars {
         root: &Path,
         handlebars: &Handlebars<'_>,
         redirects: &HashMap<String, String>,
+        site_url: &Option<String>,
     ) -> Result<()> {
         if redirects.is_empty() {
             return Ok(());
@@ -357,12 +358,18 @@ impl HtmlHandlebars {
 
         for (original, new) in redirects {
             log::debug!("Redirecting \"{}\" → \"{}\"", original, new);
-            // Note: all paths are relative to the build directory, so the
+            // Note: all original paths are relative to the build directory, so the
             // leading slash in an absolute path means nothing (and would mess
             // up `root.join(original)`).
             let original = original.trim_start_matches("/");
             let filename = root.join(original);
-            self.emit_redirect(handlebars, &filename, new)?;
+            let regex = Regex::new(r##"(^/.*$)"##).unwrap();
+            let destination = if site_url.is_some() && site_url.as_ref() != Some(&"/".to_string()) && regex.is_match(new) {
+                format!("{}{}", site_url.as_ref().unwrap().to_string(), new.trim_start_matches("/"))
+            } else {
+                new.to_string()
+            };
+            self.emit_redirect(handlebars, &filename, &destination)?;
         }
 
         Ok(())
@@ -535,8 +542,7 @@ impl Renderer for HtmlHandlebars {
                 super::search::create_files(&search, &destination, &book)?;
             }
         }
-
-        self.emit_redirects(&ctx.destination, &handlebars, &html_config.redirect)
+        self.emit_redirects(&ctx.destination, &handlebars, &html_config.redirect, &html_config.site_url)
             .context("Unable to emit redirects")?;
 
         // Copy all remaining files, avoid a recursive copy from/to the book build dir
